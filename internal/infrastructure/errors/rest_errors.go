@@ -1,6 +1,15 @@
 package errors
 
-import "net/http"
+import (
+	"net/http"
+)
+
+const (
+	BadRequest = "bad request"
+	NotFount = "not found"
+	InternalError = "internal error"
+	DatabaseError = "database error"
+)
 
 type RestErr struct {
 	Message string `json:"message"`
@@ -8,18 +17,22 @@ type RestErr struct {
 	Error   string `json:"error"`
 }
 
-func NewBadRequestError(message string) *RestErr {
-	return &RestErr{
-		Message: message,
-		Status: http.StatusBadRequest,
-		Error: "bad_request",
+func HandleError(option string, message string) *RestErr {
+	err := RestErr{}
+	err.Message = message
+	switch option {
+	case BadRequest:
+		err.Status = http.StatusBadRequest
+		err.Error = "bad_request"
+	case NotFount:
+		err.Status = http.StatusNotFound
+		err.Error = "not_found"
+	case InternalError:
+		err.Status = http.StatusInternalServerError
+		err.Error = "internal_server_error"
+	case DatabaseError:
+		err.Status = http.StatusInternalServerError
+		err.Error = "internal_server_error"
 	}
-}
-
-func NewNotFoundError(message string) *RestErr {
-	return &RestErr{
-		Message: message,
-		Status: http.StatusNotFound,
-		Error: "not_found",
-	}
+	return &err
 }
