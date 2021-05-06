@@ -5,6 +5,7 @@
 package users
 
 import (
+	"github.com/esequielvirtuoso/bookstore_oauth-golib/oauth"
 	"github.com/esequielvirtuoso/bookstore_users_api/domain/users"
 	"github.com/esequielvirtuoso/bookstore_users_api/internal/infrastructure/errors"
 	"github.com/esequielvirtuoso/bookstore_users_api/services"
@@ -13,17 +14,28 @@ import (
 	"strconv"
 )
 
-func getUserID(userIDParam string)(int64, *errors.RestErr) {
+func getUserID(userIDParam string) (int64, *errors.RestErr) {
 	userId, userErr := strconv.ParseInt(userIDParam, 10, 64)
-	if userErr != nil{
-		return 0, errors.HandleError(errors.BadRequest,"user id should be a number")
+	if userErr != nil {
+		return 0, errors.HandleError(errors.BadRequest, "user id should be a number")
 	}
 	return userId, nil
 }
 
 func Get(c *gin.Context) {
+	if err := oauth.AuthenticateRequest(c.Request); err != nil {
+		c.JSON(err.Status, err)
+		return
+	}
+
+	if callerId := oauth.GetCallerId(c.Request); callerId == 0 {
+		restErr := errors.HandleError(errors.Unauthorized, errors.Unauthorized)
+		c.JSON(restErr.Status, restErr)
+		return
+	}
+
 	userId, idErr := getUserID(c.Param("user_id"))
-	if idErr != nil{
+	if idErr != nil {
 		c.JSON(idErr.Status, idErr)
 		return
 	}
@@ -33,13 +45,20 @@ func Get(c *gin.Context) {
 		c.JSON(getErr.Status, getErr)
 		return
 	}
-	c.JSON(http.StatusOK, user.Marshall(c.GetHeader("X-Public") == "true" ))
+
+	// if caller is same as user requested we can show the full data
+	if oauth.GetCallerId(c.Request) == user.Id {
+		c.JSON(http.StatusOK, user.Marshall(false))
+		return
+	}
+
+	c.JSON(http.StatusOK, user.Marshall(oauth.IsPublic(c.Request)))
 }
 
 func Create(c *gin.Context) {
 	var user users.User
 	if err := c.ShouldBindJSON(&user); err != nil {
-		restErr := errors.HandleError(errors.BadRequest,"Invalid JSON body")
+		restErr := errors.HandleError(errors.BadRequest, "Invalid JSON body")
 		c.JSON(restErr.Status, restErr)
 		return
 	}
@@ -49,19 +68,19 @@ func Create(c *gin.Context) {
 		c.JSON(saveErr.Status, saveErr)
 		return
 	}
-	c.JSON(http.StatusCreated, result.Marshall(c.GetHeader("X-Public") == "true" ))
+	c.JSON(http.StatusCreated, result.Marshall(c.GetHeader("X-Public") == "true"))
 }
 
 func Update(c *gin.Context) {
 	userId, idErr := getUserID(c.Param("user_id"))
-	if idErr != nil{
+	if idErr != nil {
 		c.JSON(idErr.Status, idErr)
 		return
 	}
 
 	var user users.User
 	if err := c.ShouldBindJSON(&user); err != nil {
-		restErr := errors.HandleError(errors.BadRequest,"Invalid JSON body")
+		restErr := errors.HandleError(errors.BadRequest, "Invalid JSON body")
 		c.JSON(restErr.Status, restErr)
 		return
 	}
@@ -74,12 +93,12 @@ func Update(c *gin.Context) {
 		c.JSON(err.Status, err)
 		return
 	}
-	c.JSON(http.StatusCreated, result.Marshall(c.GetHeader("X-Public") == "true" ))
+	c.JSON(http.StatusCreated, result.Marshall(c.GetHeader("X-Public") == "true"))
 }
 
 func Delete(c *gin.Context) {
 	userId, idErr := getUserID(c.Param("user_id"))
-	if idErr != nil{
+	if idErr != nil {
 		c.JSON(idErr.Status, idErr)
 		return
 	}
@@ -99,7 +118,7 @@ func Search(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, users.Marshall(c.GetHeader("X-Public") == "true" ))
+	c.JSON(http.StatusOK, users.Marshall(c.GetHeader("X-Public") == "true"))
 }
 
 func Login(c *gin.Context) {
@@ -115,5 +134,5 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, user.Marshall(c.GetHeader("X-Public") == "true" ))
+	c.JSON(http.StatusOK, user.Marshall(c.GetHeader("X-Public") == "true"))
 }
