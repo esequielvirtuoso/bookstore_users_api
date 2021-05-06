@@ -5,10 +5,13 @@ import (
 )
 
 const (
-	BadRequest = "bad request"
-	NotFount = "not found"
-	InternalError = "internal error"
-	DatabaseError = "database error"
+	BadRequest         = "bad request"
+	NotFound           = "not found"
+	InternalError      = "internal error"
+	DatabaseError      = "database error"
+	Unauthorized       = "unauthorized"
+	InvalidJsonBody    = "invalid json body"
+	InvalidCredentials = "invalid credentials"
 )
 
 type RestErr struct {
@@ -24,15 +27,15 @@ func HandleError(option string, message string) *RestErr {
 	case BadRequest:
 		err.Status = http.StatusBadRequest
 		err.Error = "bad_request"
-	case NotFount:
+	case NotFound:
 		err.Status = http.StatusNotFound
 		err.Error = "not_found"
 	case InternalError:
 		err.Status = http.StatusInternalServerError
 		err.Error = "internal_server_error"
-	case DatabaseError:
-		err.Status = http.StatusInternalServerError
-		err.Error = "internal_server_error"
+	case Unauthorized:
+		err.Status = http.StatusUnauthorized
+		err.Error = "unauthorized"
 	}
 	return &err
 }

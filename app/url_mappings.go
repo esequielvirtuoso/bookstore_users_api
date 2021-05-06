@@ -32,4 +32,7 @@ func mapUrls() {
 
 	// Search
 	router.GET("/internal/users/search", users.Search)
+
+	// Login
+	router.POST("/users/login", users.Login)
 }

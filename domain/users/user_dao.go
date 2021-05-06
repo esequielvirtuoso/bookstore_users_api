@@ -8,14 +8,17 @@ import (
 	"github.com/esequielvirtuoso/bookstore_users_api/internal/infrastructure/datasources/mysql/users_db"
 	"github.com/esequielvirtuoso/bookstore_users_api/internal/infrastructure/errors"
 	"github.com/esequielvirtuoso/bookstore_users_api/pkg/logger"
+	"github.com/esequielvirtuoso/bookstore_users_api/pkg/mysql_utils"
+	"strings"
 )
 
 const (
-	queryInsertUser = "INSERT INTO users(first_name, last_name, email, date_created, password, status) VALUES(?,?,?,?,?,?);"
-	queryGetUser = "SELECT id, first_name, last_name, email, date_created, status FROM users WHERE id=?;"
-	queryUpdateUser = "UPDATE users SET first_name=?, last_name=?, email=? WHERE id=?;"
-	queryDeleteUser = "DELETE FROM users WHERE id=?;"
-	queryFindUserByStatus = "SELECT id, first_name, last_name, email, date_created, status FROM users WHERE status=?;"
+	queryInsertUser             = "INSERT INTO users(first_name, last_name, email, date_created, password, status) VALUES(?,?,?,?,?,?);"
+	queryGetUser                = "SELECT id, first_name, last_name, email, date_created, status FROM users WHERE id=?;"
+	queryUpdateUser             = "UPDATE users SET first_name=?, last_name=?, email=? WHERE id=?;"
+	queryDeleteUser             = "DELETE FROM users WHERE id=?;"
+	queryFindUserByStatus       = "SELECT id, first_name, last_name, email, date_created, status FROM users WHERE status=?;"
+	queryFindByEmailAndPassword = "SELECT id, first_name, last_name, email, date_created, status FROM users WHERE email=? AND password=? AND status=?;"
 )
 
 // Mock
@@ -23,7 +26,7 @@ var (
 	usersDB = make(map[int64]*User)
 )
 
-func (user *User)Get() *errors.RestErr {
+func (user *User) Get() *errors.RestErr {
 	stmt, err := users_db.Client.Prepare(queryGetUser)
 	if err != nil {
 		logger.Error("error when trying to prepare get user statement", err)
@@ -39,7 +42,7 @@ func (user *User)Get() *errors.RestErr {
 	return nil
 }
 
-func (user *User)Save() * errors.RestErr {
+func (user *User) Save() *errors.RestErr {
 	stmt, err := users_db.Client.Prepare(queryInsertUser)
 	if err != nil {
 		logger.Error("error when trying to prepare save user statement", err)
@@ -118,7 +121,26 @@ func (user *User) FindByStatus(status string) ([]User, *errors.RestErr) {
 		results = append(results, user)
 	}
 	if len(results) == 0 {
-		return nil, errors.HandleError(errors.NotFount, fmt.Sprintf("no users matching status %s", status))
+		return nil, errors.HandleError(errors.NotFound, fmt.Sprintf("no users matching status %s", status))
 	}
 	return results, nil
+}
+
+func (user *User) FindByEmailAndPassword() *errors.RestErr {
+	stmt, err := users_db.Client.Prepare(queryFindByEmailAndPassword)
+	if err != nil {
+		logger.Error("error when trying to prepare get user bay email and password statement", err)
+		return errors.HandleError(errors.InternalError, errors.DatabaseError)
+	}
+	defer stmt.Close()
+
+	result := stmt.QueryRow(user.Email, user.Password, StatusActive)
+	if getErr := result.Scan(&user.Id, &user.FirstName, &user.LastName, &user.Email, &user.DateCreated, &user.Status); getErr != nil {
+		if strings.Contains(getErr.Error(), mysql_utils.ErrorNoRows) {
+			return errors.HandleError(errors.Unauthorized, errors.InvalidCredentials)
+		}
+		logger.Error("error when trying to get user by email and password", getErr)
+		return errors.HandleError(errors.InternalError, errors.DatabaseError)
+	}
+	return nil
 }
